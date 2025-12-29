@@ -32,6 +32,7 @@ const App: React.FC = () => {
   const [historyViewMode, setHistoryViewMode] = useState<'grid' | 'list'>('grid');
   const [savedScrolls, setSavedScrolls] = useState<GeneratedResult[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loginCount, setLoginCount] = useState<number>(0);
   const [notification, setNotification] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showImmersiveImage, setShowImmersiveImage] = useState(false);
@@ -61,6 +62,11 @@ const App: React.FC = () => {
       } catch (e) {
         localStorage.removeItem('aaruto_user');
       }
+    }
+    const savedLoginCount = localStorage.getItem('aaruto_login_count');
+    if (savedLoginCount) {
+      const n = parseInt(savedLoginCount, 10);
+      if (!Number.isNaN(n)) setLoginCount(n);
     }
     
     const savedHistoryLocal = localStorage.getItem('aaruto_history');
@@ -101,6 +107,18 @@ const App: React.FC = () => {
     setTimeout(() => setNotification(null), 2500);
   };
 
+  const incrementLoginCount = () => {
+    setLoginCount(prev => {
+      const n = prev + 1;
+      localStorage.setItem('aaruto_login_count', String(n));
+      // If a global visitor counter is available (Firebase script), increment it too
+      try {
+        (window as any).incrementVisitorCount?.();
+      } catch (e) { /* noop */ }
+      return n;
+    });
+  };
+
   const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
@@ -110,6 +128,7 @@ const App: React.FC = () => {
         const u = { email, isAdmin: true };
         setUser(u);
         localStorage.setItem('aaruto_user', JSON.stringify(u));
+        incrementLoginCount();
         return;
       }
       const users = JSON.parse(localStorage.getItem('aaruto_all_users') || '[]');
@@ -118,6 +137,7 @@ const App: React.FC = () => {
         const u = { email: found.email, isAdmin: false };
         setUser(u);
         localStorage.setItem('aaruto_user', JSON.stringify(u));
+        incrementLoginCount();
       } else setError("Mismatch. Access denied.");
     } else {
       const users = JSON.parse(localStorage.getItem('aaruto_all_users') || '[]');
@@ -127,6 +147,7 @@ const App: React.FC = () => {
       const u = { email: email, isAdmin: false };
       setUser(u);
       localStorage.setItem('aaruto_user', JSON.stringify(u));
+      incrementLoginCount();
     }
   };
 
@@ -290,11 +311,14 @@ const App: React.FC = () => {
         <div className="flex items-center gap-4">
           <div className="hidden sm:flex flex-col items-end">
              <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest">{user.isAdmin ? 'MASTER ARCHITECT' : 'SUMMONER'}</span>
-             <span className="text-[9px] text-gray-500 truncate max-w-[150px]">{user.email}</span>
+             <div className="flex items-center gap-3">
+              <span className="text-[9px] text-gray-500 truncate max-w-[150px]">{user.email}</span>
+              <span className="text-[9px] text-gray-400 font-black uppercase tracking-widest">Sessions: {loginCount}</span>
+             </div>
           </div>
           <button onClick={() => setShowSettings(!showSettings)} className="w-11 h-11 rounded-xl bg-white/5 flex items-center justify-center text-gray-400 hover:text-white transition-all border border-white/10"><i className="fa-solid fa-gear"></i></button>
           <button onClick={() => setShowSensei(!showSensei)} className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${showSensei ? 'bg-orange-500 text-white shadow-orange-500/30' : 'bg-white/5 text-gray-400 border border-white/10'}`}><i className="fa-solid fa-comments"></i></button>
-          <button onClick={() => { localStorage.removeItem('aaruto_user'); setUser(null); }} className="text-[11px] text-red-500 font-black uppercase tracking-widest px-4 py-2 hover:bg-red-500/10 rounded-xl transition-all">OUT</button>
+          <button onClick={() => { localStorage.removeItem('aaruto_user'); setUser(null); setLoginCount(0); showNotify('Session ended.'); }} className="text-[11px] text-red-500 font-black uppercase tracking-widest px-4 py-2 hover:bg-red-500/10 rounded-xl transition-all">OUT</button>
         </div>
       </header>
 
